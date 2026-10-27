@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Gift Roulette Casino</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    --gold: #F5C842;
+    --gold-dark: #C9960A;
+    --red: #E0342B;
+    --red-dark: #9C1A14;
+    --bg: #0D0D14;
+    --bg2: #161623;
+    --bg3: #1E1E30;
+    --card: #22223A;
+    --border: #2E2E50;
+    --text: #F0EEF8;
+    --text2: #9896B8;
+    --green: #2ECC71;
+    --purple: #8B5CF6;
+    --cyan: #06B6D4;
+
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bot: env(safe-area-inset-bottom, 0px);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, 'Segoe UI', sans-serif;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    padding-top: var(--safe-top);
+    padding-bottom: var(--safe-bot);
+  }
+
+  /* ── HEADER ── */
+  .header {
+    background: linear-gradient(135deg, #1A0A2E 0%, #0D1535 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: var(--safe-top);
+    z-index: 100;
+  }
+  .header-logo {
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    background: linear-gradient(90deg, var(--gold), #FFF8DC);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .coins-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--card);
+    border: 1px solid var(--gold-dark);
+    border-radius: 20px;
+    padding: 6px 12px;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--gold);
+    cursor: pointer;
+    transition: transform .15s;
+  }
+  .coins-badge:active { transform: scale(.95); }
+
+  /* ── TABS ── */
+  .tabs {
+    display: flex;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab {
+    flex: 0 0 auto;
+    padding: 11px 20px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text2);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all .2s;
+    white-space: nowrap;
+  }
+  .tab.active {
+    color: var(--gold);
+    border-bottom-color: var(--gold);
+  }
+
+  /* ── PAGES ── */
+  .page { display: none; padding: 16px; }
+  .page.active { display: block; }
+
+  /* ── ROULETTE ── */
+  .roulette-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .wheel-wrap {
+    position: relative;
+    width: 300px;
+    height: 300px;
+  }
+  .wheel-wrap::before {
+    content: '';
+    position: absolute;
+    inset: -6px;
+    border-radius: 50%;
+    background: conic-gradient(
+      var(--gold) 0deg, var(--gold-dark) 45deg,
+      var(--red) 45deg, var(--red-dark) 90deg,
+      var(--purple) 90deg, #6D28D9 135deg,
+      var(--cyan) 135deg, #0284C7 180deg,
+      var(--green) 180deg, #16A34A 225deg,
+      var(--gold) 225deg, var(--gold-dark) 270deg,
+      var(--red) 270deg, var(--red-dark) 315deg,
+      var(--purple) 315deg, #6D28D9 360deg
+    );
+    z-index: 0;
+    box-shadow: 0 0 40px rgba(245,200,66,.35);
+  }
+  .wheel-outer {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    overflow: hidden;
+    z-index: 1;
+  }
+
+  canvas#wheel {
+    display: block;
+    width: 300px;
+    height: 300px;
+    border-radius: 50%;
+  }
+
+  /* Pointer */
+  .pointer {
+    position: absolute;
+    top: -18px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    width: 0;
+    height: 0;
+    border-left: 12px solid transparent;
+    border-right: 12px solid transparent;
+    border-top: 28px solid var(--gold);
+    filter: drop-shadow(0 2px 6px rgba(245,200,66,.7));
+  }
+
+  .spin-btn {
+    width: 100%;
+    max-width: 300px;
+    padding: 16px;
+    background: linear-gradient(135deg, var(--gold), var(--gold-dark));
+    color: #1A0A00;
+    font-size: 17px;
+    font-weight: 800;
+    border: none;
+    border-radius: 14px;
+    cursor: pointer;
+    letter-spacing: .3px;
+    transition: transform .15s, box-shadow .15s;
+    box-shadow: 0 4px 20px rgba(245,200,66,.4);
+  }
+  .spin-btn:active:not(:disabled) { transform: scale(.97); }
+  .spin-btn:disabled {
+    opacity: .55;
+    cursor: default;
+  }
+
+  .spin-cost {
+    text-align: center;
+    color: var(--text2);
+    font-size: 13px;
+    margin-top: -12px;
+  }
+  .spin-cost span { color: var(--gold); font-weight: 600; }
+
+  /* ── PRIZES LIST ── */
+  .prizes-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text2);
+    text-transform: uppercase;
+    letter-spacing: .8px;
+    margin-bottom: 10px;
+  }
+  .prizes-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    width: 100%;
+    max-width: 300px;
+  }
+  .prize-chip {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+  }
+  .prize-chip .pct {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--text2);
+  }
+
+  /* ── RESULT MODAL ── */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.75);
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .25s;
+    padding: 20px;
+  }
+  .modal-overlay.show {
+    opacity: 1;
+    pointer-events: all;
+  }
+  .modal {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 28px 24px;
+    text-align: center;
+    max-width: 320px;
+    width: 100%;
+    transform: scale(.85);
+    transition: transform .3s cubic-bezier(.34,1.56,.64,1);
+  }
+  .modal-overlay.show .modal { transform: scale(1); }
+  .modal-emoji { font-size: 64px; margin-bottom: 12px; animation: pop .4s ease; }
+  @keyframes pop { 0%{transform:scale(0)} 60%{transform:scale(1.2)} 100%{transform:scale(1)} }
+  .modal-title { font-size: 22px; font-weight: 800; margin-bottom: 6px; }
+  .modal-sub { color: var(--text2); font-size: 14px; margin-bottom: 20px; }
+  .modal-close {
+    width: 100%;
+    padding: 13px;
+    background: var(--gold);
+    color: #1A0A00;
+    border: none;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  /* ── STATS CARDS ── */
+  .stats-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .stat-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 10px;
+    text-align: center;
+  }
+  .stat-val {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--gold);
+  }
+  .stat-lbl {
+    font-size: 11px;
+    color: var(--text2);
+    margin-top: 2px;
+  }
+
+  /* ── HISTORY ── */
+  .section-title {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 10px;
+    color: var(--text);
+  }
+  .history-list { display: flex; flex-direction: column; gap: 6px; }
+  .history-item {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+  }
+  .history-item .hi-emoji { font-size: 22px; }
+  .history-item .hi-name { flex: 1; font-weight: 500; }
+  .history-item .hi-coins {
+    font-weight: 700;
+    font-size: 13px;
+  }
+  .hi-coins.pos { color: var(--green); }
+  .hi-coins.neg { color: var(--red); }
+  .history-empty {
+    text-align: center;
+    color: var(--text2);
+    font-size: 14px;
+    padding: 30px 0;
+  }
+
+  /* ── SHOP / GAMES COMING SOON ── */
+  .coming-soon {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text2);
+  }
+  .coming-soon .cs-emoji { font-size: 56px; margin-bottom: 16px; }
+  .coming-soon h3 { font-size: 20px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+  .coming-soon p { font-size: 14px; line-height: 1.6; }
+
+  .game-list { display: flex; flex-direction: column; gap: 10px; }
+  .game-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    cursor: pointer;
+    transition: transform .15s, border-color .15s;
+  }
+  .game-card:active { transform: scale(.98); }
+  .game-card.locked { opacity: .5; cursor: default; }
+  .game-card.locked:active { transform: none; }
+  .game-icon { font-size: 36px; }
+  .game-info { flex: 1; }
+  .game-name { font-size: 16px; font-weight: 700; }
+  .game-desc { font-size: 12px; color: var(--text2); margin-top: 2px; }
+  .game-badge {
+    background: var(--red);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 3px 7px;
+    border-radius: 20px;
+  }
+  .game-badge.soon { background: var(--border); color: var(--text2); }
+
+  /* ── CONFETTI ── */
+  .confetti-wrap {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    pointer-events: none;
+    z-index: 300;
+    overflow: hidden;
+    height: 100%;
+  }
+  .confetti-piece {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    top: -20px;
+    animation: confetti-fall linear forwards;
+  }
+  @keyframes confetti-fall {
+    to { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-logo">🎰 GiftCasino</div>
+  <div class="coins-badge" onclick="showDailyBonus()">
+    🪙 <span id="coinCount">1000</span>
+  </div>
+</div>
+
+<!-- TABS -->
+<div class="tabs">
+  <div class="tab active" onclick="showTab('roulette',this)">🎡 Рулетка</div>
+  <div class="tab" onclick="showTab('games',this)">🎮 Игры</div>
+  <div class="tab" onclick="showTab('history',this)">📜 История</div>
+  <div class="tab" onclick="showTab('profile',this)">👤 Профиль</div>
+</div>
+
+<!-- ROULETTE PAGE -->
+<div class="page active" id="page-roulette">
+  <div class="roulette-container">
+    <div class="wheel-wrap">
+      <div class="pointer"></div>
+      <div class="wheel-outer">
+        <canvas id="wheel" width="300" height="300"></canvas>
+      </div>
+    </div>
+
+    <button class="spin-btn" id="spinBtn" onclick="spinWheel()">🎰 КРУТИТЬ!</button>
+    <p class="spin-cost">Стоимость: <span>100 монет</span></p>
+
+    <div style="width:100%;max-width:300px">
+      <div class="prizes-title">Призы</div>
+      <div class="prizes-grid" id="prizeList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- GAMES PAGE -->
+<div class="page" id="page-games">
+  <div class="game-list">
+    <div class="game-card" onclick="showTab('roulette', document.querySelector('.tab'))">
+      <div class="game-icon">🎡</div>
+      <div class="game-info">
+        <div class="game-name">Рулетка подарков</div>
+        <div class="game-desc">Крути и выигрывай призы</div>
+      </div>
+      <div class="game-badge">ИГРАТЬ</div>
+    </div>
+    <div class="game-card locked">
+      <div class="game-icon">🃏</div>
+      <div class="game-info">
+        <div class="game-name">Блэкджек</div>
+        <div class="game-desc">Набери 21 и победи дилера</div>
+      </div>
+      <div class="game-badge soon">Скоро</div>
+    </div>
+    <div class="game-card locked">
+      <div class="game-icon">🎰</div>
+      <div class="game-info">
+        <div class="game-name">Слоты</div>
+        <div class="game-desc">777 — сорви джекпот!</div>
+      </div>
+      <div class="game-badge soon">Скоро</div>
+    </div>
+    <div class="game-card locked">
+      <div class="game-icon">🎲</div>
+      <div class="game-info">
+        <div class="game-name">Кости</div>
+        <div class="game-desc">Угадай выпавшее число</div>
+      </div>
+      <div class="game-badge soon">Скоро</div>
+    </div>
+    <div class="game-card locked">
+      <div class="game-icon">🪙</div>
+      <div class="game-info">
+        <div class="game-name">Орёл и решка</div>
+        <div class="game-desc">50/50 — удвой монеты</div>
+      </div>
+      <div class="game-badge soon">Скоро</div>
+    </div>
+  </div>
+</div>
+
+<!-- HISTORY PAGE -->
+<div class="page" id="page-history">
+  <div class="section-title">История игр</div>
+  <div class="history-list" id="historyList">
+    <div class="history-empty">Ещё нет игр<br>Крути рулетку! 🎡</div>
+  </div>
+</div>
+
+<!-- PROFILE PAGE -->
+<div class="page" id="page-profile">
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-val" id="stat-spins">0</div>
+      <div class="stat-lbl">Крутов</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" id="stat-wins">0</div>
+      <div class="stat-lbl">Побед</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" id="stat-best">—</div>
+      <div class="stat-lbl">Лучший приз</div>
+    </div>
+  </div>
+
+  <div class="section-title">Ежедневный бонус</div>
+  <div class="game-card" onclick="showDailyBonus()" style="margin-bottom:16px">
+    <div class="game-icon">🎁</div>
+    <div class="game-info">
+      <div class="game-name">Получить монеты</div>
+      <div class="game-desc">+500 монет каждый день бесплатно</div>
+    </div>
+    <div class="game-badge" style="background:var(--green)">ВЗЯТЬ</div>
+  </div>
+
+  <div class="section-title">Топ игроков</div>
+  <div class="history-list">
+    <div class="history-item"><span class="hi-emoji">🥇</span><span class="hi-name">@lucky_one</span><span class="hi-coins pos">52,400 🪙</span></div>
+    <div class="history-item"><span class="hi-emoji">🥈</span><span class="hi-name">@spinner99</span><span class="hi-coins pos">38,100 🪙</span></div>
+    <div class="history-item"><span class="hi-emoji">🥉</span><span class="hi-name">@gifthunter</span><span class="hi-coins pos">29,700 🪙</span></div>
+    <div class="history-item"><span class="hi-emoji">4️⃣</span><span class="hi-name">@rouletteking</span><span class="hi-coins pos">17,200 🪙</span></div>
+    <div class="history-item"><span class="hi-emoji">5️⃣</span><span class="hi-name">@jackpot_fan</span><span class="hi-coins pos">11,500 🪙</span></div>
+  </div>
+</div>
+
+<!-- RESULT MODAL -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-emoji" id="modal-emoji">🎁</div>
+    <div class="modal-title" id="modal-title">Поздравляем!</div>
+    <div class="modal-sub" id="modal-sub">Ты выиграл приз</div>
+    <button class="modal-close" onclick="closeModal()">Отлично! 🎉</button>
+  </div>
+</div>
+
+<!-- CONFETTI -->
+<div class="confetti-wrap" id="confettiWrap"></div>
+
+<script>
+// ── TELEGRAM INIT ──
+const tg = window.Telegram?.WebApp;
+if (tg) {
+  tg.ready();
+  tg.expand();
+  tg.setHeaderColor('#0D0D14');
+  tg.setBackgroundColor('#0D0D14');
+}
+
+// ── STATE ──
+let coins = parseInt(localStorage.getItem('coins') ?? '1000');
+let spins = parseInt(localStorage.getItem('spins') ?? '0');
+let wins  = parseInt(localStorage.getItem('wins')  ?? '0');
+let bestPrize = localStorage.getItem('best') ?? null;
+let history   = JSON.parse(localStorage.getItem('history') ?? '[]');
+let spinning  = false;
+let dailyClaimed = localStorage.getItem('dailyDate') === new Date().toDateString();
+
+function saveState() {
+  localStorage.setItem('coins', coins);
+  localStorage.setItem('spins', spins);
+  localStorage.setItem('wins', wins);
+  localStorage.setItem('best', bestPrize ?? '');
+  localStorage.setItem('history', JSON.stringify(history.slice(0,50)));
+}
+
+// ── PRIZES ──
+const PRIZES = [
+  { emoji: '💎', name: 'Кристалл',    coins: 5000, prob: 2,  color: '#06B6D4' },
+  { emoji: '🌟', name: 'Звезда',      coins: 2000, prob: 5,  color: '#F59E0B' },
+  { emoji: '🎁', name: 'Большой приз',coins: 1000, prob: 8,  color: '#8B5CF6' },
+  { emoji: '💰', name: 'Джекпот',     coins: 800,  prob: 10, color: '#10B981' },
+  { emoji: '🍀', name: 'Удача',        coins: 500,  prob: 15, color: '#34D399' },
+  { emoji: '🎀', name: 'Подарок',     coins: 300,  prob: 20, color: '#EC4899' },
+  { emoji: '⭐', name: 'Звёздочка',   coins: 150,  prob: 20, color: '#FCD34D' },
+  { emoji: '🃏', name: 'Утешительный',coins: 50,   prob: 20, color: '#6B7280' },
+];
+
+// ── WHEEL DRAW ──
+const canvas = document.getElementById('wheel');
+const ctx    = canvas.getContext('2d');
+const cx = 150, cy = 150, R = 148;
+let rotation = 0;
+
+function drawWheel(rot) {
+  ctx.clearRect(0, 0, 300, 300);
+  const total = PRIZES.reduce((s, p) => s + p.prob, 0);
+  let angle = rot;
+  PRIZES.forEach((p, i) => {
+    const slice = (p.prob / total) * Math.PI * 2;
+    // Segment
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, R, angle, angle + slice);
+    ctx.closePath();
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R);
+    g.addColorStop(0, darken(p.color, .5));
+    g.addColorStop(1, p.color);
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,.25)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    // Emoji + text
+    const mid = angle + slice / 2;
+    ctx.save();
+    ctx.translate(cx + Math.cos(mid) * (R * .65), cy + Math.sin(mid) * (R * .65));
+    ctx.rotate(mid + Math.PI / 2);
+    ctx.font = '20px serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(p.emoji, 0, 0);
+    ctx.font = 'bold 9px -apple-system,sans-serif';
+    ctx.fillStyle = '#fff';
+    ctx.fillText('+' + p.coins, 0, 13);
+    ctx.restore();
+    angle += slice;
+  });
+  // Center circle
+  const cg = ctx.createRadialGradient(cx,cy,0,cx,cy,28);
+  cg.addColorStop(0,'#2A1A4E');
+  cg.addColorStop(1,'#0D0D14');
+  ctx.beginPath();
+  ctx.arc(cx, cy, 28, 0, Math.PI*2);
+  ctx.fillStyle = cg;
+  ctx.fill();
+  ctx.strokeStyle = '#F5C842';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.font = '18px serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('🎰', cx, cy);
+}
+
+function darken(hex, amt) {
+  let n = parseInt(hex.slice(1), 16);
+  let r = Math.max(0, (n >> 16) * (1 - amt));
+  let g = Math.max(0, ((n >> 8) & 0xff) * (1 - amt));
+  let b = Math.max(0, (n & 0xff) * (1 - amt));
+  return '#' + [r,g,b].map(x => Math.round(x).toString(16).padStart(2,'0')).join('');
+}
+
+drawWheel(0);
+
+// ── PRIZE LIST UI ──
+function buildPrizeList() {
+  const total = PRIZES.reduce((s,p)=>s+p.prob,0);
+  document.getElementById('prizeList').innerHTML = PRIZES.map(p =>
+    `<div class="prize-chip">
+      <span>${p.emoji}</span>
+      <span>${p.name}</span>
+      <span class="pct">${Math.round(p.prob/total*100)}%</span>
+    </div>`
+  ).join('');
+}
+buildPrizeList();
+
+// ── SPIN ──
+function spinWheel() {
+  if (spinning) return;
+  if (coins < 100) {
+    showModal('😢', 'Нет монет', 'Недостаточно монет для кручения. Возьми ежедневный бонус!');
+    return;
+  }
+  coins -= 100;
+  spins++;
+  updateUI();
+  saveState();
+  spinning = true;
+  document.getElementById('spinBtn').disabled = true;
+
+  // Pick prize via weighted random
+  const total = PRIZES.reduce((s,p)=>s+p.prob,0);
+  let r = Math.random() * total, prize;
+  for (const p of PRIZES) { r -= p.prob; if (r <= 0) { prize = p; break; } }
+  prize = prize || PRIZES[PRIZES.length-1];
+
+  // Calculate target angle so winning segment is at top (pointer at -π/2)
+  const totalProb = total;
+  let cumulative = 0;
+  const prizeIndex = PRIZES.indexOf(prize);
+  for (let i = 0; i < prizeIndex; i++) cumulative += PRIZES[i].prob;
+  const sliceAngle = (prize.prob / totalProb) * Math.PI * 2;
+  const segStart = (cumulative / totalProb) * Math.PI * 2;
+  const segMid = segStart + sliceAngle / 2;
+  const targetAngle = (-Math.PI / 2) - segMid;
+  const fullSpins = (Math.PI * 2) * (5 + Math.floor(Math.random() * 4));
+  const finalRot  = fullSpins + targetAngle;
+
+  const duration = 4000 + Math.random() * 1000;
+  const start = performance.now();
+  const startRot = rotation % (Math.PI * 2);
+
+  function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
+
+  function frame(now) {
+    const t = Math.min((now - start) / duration, 1);
+    const cur = startRot + finalRot * easeOut(t);
+    rotation = cur;
+    drawWheel(cur);
+    if (t < 1) { requestAnimationFrame(frame); return; }
+    // Done
+    spinning = false;
+    document.getElementById('spinBtn').disabled = false;
+    coins += prize.coins;
+    wins++;
+    if (!bestPrize || prize.coins > (PRIZES.find(p=>p.name===bestPrize)?.coins??0)) bestPrize = prize.name;
+    updateUI();
+    addHistory(prize);
+    saveState();
+    tg?.HapticFeedback?.notificationOccurred('success');
+    launchConfetti();
+    showModal(prize.emoji, prize.name, `+${prize.coins.toLocaleString()} монет зачислено на счёт!`);
+  }
+  requestAnimationFrame(frame);
+}
+
+// ── MODAL ──
+function showModal(emoji, title, sub) {
+  document.getElementById('modal-emoji').textContent = emoji;
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-sub').textContent = sub;
+  document.getElementById('modal').classList.add('show');
+}
+function closeModal() {
+  document.getElementById('modal').classList.remove('show');
+}
+
+// ── DAILY BONUS ──
+function showDailyBonus() {
+  if (dailyClaimed) {
+    showModal('⏰', 'Уже получено', 'Возвращайся завтра за новым бонусом!');
+    return;
+  }
+  coins += 500;
+  dailyClaimed = true;
+  localStorage.setItem('dailyDate', new Date().toDateString());
+  updateUI();
+  saveState();
+  launchConfetti();
+  showModal('🎁', 'Ежедневный бонус!', '+500 монет зачислено! Возвращайся завтра.');
+}
+
+// ── HISTORY ──
+function addHistory(prize) {
+  history.unshift({ emoji: prize.emoji, name: prize.name, coins: prize.coins, ts: Date.now() });
+  renderHistory();
+}
+function renderHistory() {
+  const el = document.getElementById('historyList');
+  if (!history.length) { el.innerHTML = '<div class="history-empty">Ещё нет игр<br>Крути рулетку! 🎡</div>'; return; }
+  el.innerHTML = history.slice(0,20).map(h =>
+    `<div class="history-item">
+      <span class="hi-emoji">${h.emoji}</span>
+      <span class="hi-name">${h.name}</span>
+      <span class="hi-coins pos">+${h.coins.toLocaleString()} 🪙</span>
+    </div>`
+  ).join('');
+}
+renderHistory();
+
+// ── UI UPDATE ──
+function updateUI() {
+  document.getElementById('coinCount').textContent = coins.toLocaleString();
+  document.getElementById('stat-spins').textContent = spins;
+  document.getElementById('stat-wins').textContent = wins;
+  document.getElementById('stat-best').textContent = bestPrize ? PRIZES.find(p=>p.name===bestPrize)?.emoji ?? '—' : '—';
+}
+updateUI();
+
+// ── TABS ──
+function showTab(id, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  // find tab by text content matching
+  const tabs = document.querySelectorAll('.tab');
+  const map = { roulette: 0, games: 1, history: 2, profile: 3 };
+  if (map[id] !== undefined) tabs[map[id]].classList.add('active');
+}
+
+// ── CONFETTI ──
+function launchConfetti() {
+  const wrap = document.getElementById('confettiWrap');
+  wrap.innerHTML = '';
+  const colors = ['#F5C842','#E0342B','#8B5CF6','#06B6D4','#2ECC71','#EC4899'];
+  for (let i = 0; i < 55; i++) {
+    const el = document.createElement('div');
+    el.className = 'confetti-piece';
+    el.style.cssText = `
+      left:${Math.random()*100}%;
+      background:${colors[Math.floor(Math.random()*colors.length)]};
+      border-radius:${Math.random()>.5?'50%':'2px'};
+      width:${6+Math.random()*8}px;
+      height:${6+Math.random()*8}px;
+      animation-duration:${1.5+Math.random()*2}s;
+      animation-delay:${Math.random()*.4}s;
+    `;
+    wrap.appendChild(el);
+  }
+  setTimeout(() => wrap.innerHTML = '', 3500);
+}
+</script>
+</body>
+</html>
