@@ -16,7 +16,7 @@ from aiogram.types import (
 BOT_TOKEN = "9011082336:AAGOmX51-RfhE25o1zpbiK8C-vhmHiZWsmg"
 
 # URL твоего Mini App (после деплоя замени на реальный)
-WEBAPP_URL = "https://YOUR_DOMAIN/webapp/index.html"
+WEBAPP_URL = "http://153.80.249.114"
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
